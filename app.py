@@ -16,17 +16,17 @@ from watchdog.events import FileSystemEventHandler
 app = Flask(__name__, static_folder='static')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Configuration paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 MONITORS_FILE = os.path.join(BASE_DIR, 'config', 'monitors.yml')
-STATUS_FILE = os.path.join(BASE_DIR, 'status.json')
-HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
 
-# Debug paths
-print(f"CONFIG_FILE: {CONFIG_FILE}")
-print(f"MONITORS_FILE: {MONITORS_FILE}")
-print(f"File exists: {os.path.exists(MONITORS_FILE)}")
+# In-memory storage
+STATUS_DATA = {}
+HISTORY_DATA = {
+    'history': {}  # Format: {monitor_id: [history_entries]}
+}
+
+print("Using in-memory storage for status and history")
 
 # Load app config
 try:
@@ -41,11 +41,6 @@ try:
     TIMEZONE = pytz.timezone(APP_CONFIG['app']['timezone'])
 except:
     TIMEZONE = pytz.utc
-
-# Initialize history if not exists
-if not os.path.exists(HISTORY_FILE):
-    with open(HISTORY_FILE, 'w') as f:
-        json.dump({"history": {}}, f)
 
 class ConfigReloadHandler(FileSystemEventHandler):
     def __init__(self, manager):
@@ -144,13 +139,8 @@ class Monitor:
         self.load_history()
     
     def load_history(self):
-        """Load monitor history from file"""
-        try:
-            with open(HISTORY_FILE, 'r') as f:
-                history_data = json.load(f)
-                self.history = history_data.get('history', {}).get(self.id, [])
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.history = []
+        """Load monitor history from in-memory storage"""
+        self.history = HISTORY_DATA.get('history', {}).get(self.id, [])
     
     def update_history(self, is_up: bool, response_time: float, error: str = ''):
         """Update monitor history with latest check"""
@@ -173,13 +163,20 @@ class Monitor:
             'error': error
         }
         
-        self.history.append(history_entry)
+        # Update in-memory history
+        if 'history' not in HISTORY_DATA:
+            HISTORY_DATA['history'] = {}
+            
+        if self.id not in HISTORY_DATA['history']:
+            HISTORY_DATA['history'][self.id] = []
+            
+        HISTORY_DATA['history'][self.id].append(history_entry)
+        HISTORY_DATA['history'][self.id] = HISTORY_DATA['history'][self.id][-100:]  # Keep last 100 entries
         
-        self.history = self.history[-100:]
+        # Update local history for this monitor
+        self.history = HISTORY_DATA['history'][self.id]
         
         self._update_uptime_stats()
-        
-        self._save_history()
     
     def _update_uptime_stats(self):
         """Calculate uptime statistics"""
@@ -202,20 +199,10 @@ class Monitor:
             self.status['uptime_7d'] = round(uptime, 2)
     
     def _save_history(self):
-        """Save history to file"""
-        try:
-            if os.path.exists(HISTORY_FILE):
-                with open(HISTORY_FILE, 'r') as f:
-                    history_data = json.load(f)
-            else:
-                history_data = {"history": {}}
-            
-            history_data['history'][self.id] = self.history
-            
-            with open(HISTORY_FILE, 'w') as f:
-                json.dump(history_data, f, default=str)
-        except Exception as e:
-            print(f"Error saving history: {e}")
+        """Save history to memory"""
+        if 'history' not in HISTORY_DATA:
+            HISTORY_DATA['history'] = {}
+        HISTORY_DATA['history'][self.id] = self.history
 
 # Global monitor manager instance
 monitor_manager = MonitorManager(MONITORS_FILE)
@@ -372,46 +359,35 @@ def check_monitor(monitor: Monitor) -> Monitor:
 
 def update_status():
     monitors = monitor_manager.monitors
-    status_data = {}
-    
+
     for monitor_id, monitor in monitors.items():
         try:
             if not hasattr(monitor, 'config'):
                 print(f"Missing config for monitor {monitor_id}")
                 continue
-                
+
             checked_monitor = check_monitor(monitor)
-            
-            status_data[monitor_id] = {
-                'config': checked_monitor.config,
+
+            # Update monitor status in memory
+            checked_monitor.status.update({
                 'up': checked_monitor.status.get('up', False),
                 'last_check': checked_monitor.status.get('last_check'),
                 'response_time': checked_monitor.status.get('response_time', 0),
                 'error': checked_monitor.status.get('error', ''),
                 'uptime_24h': checked_monitor.status.get('uptime_24h', 0),
-                'uptime_7d': checked_monitor.status.get('uptime_7d', 0),
-                'total_checks': checked_monitor.status.get('total_checks', 0),
-                'successful_checks': checked_monitor.status.get('successful_checks', 0)
-            }
-            
+                'uptime_7d': checked_monitor.status.get('uptime_7d', 0)
+            })
+
+            # Save history
             if hasattr(checked_monitor, '_save_history'):
                 checked_monitor._save_history()
-            
+
             time.sleep(1)
-            
+
         except Exception as e:
             print(f"Error updating status for {monitor_id}: {e}")
             import traceback
             traceback.print_exc()
-    
-    if status_data:
-        try:
-            with open(STATUS_FILE, 'w') as f:
-                json.dump(status_data, f, indent=2)
-        except Exception as e:
-            print(f"Error saving status file: {e}")
-    else:
-        print("No monitor data to save")
 
 def run_checks():
     """Main monitoring loop"""
@@ -440,38 +416,44 @@ def index():
             else:
                 category_map[category] = {'id': category, 'name': category}
         
-        if os.path.exists(STATUS_FILE):
-            with open(STATUS_FILE, 'r') as f:
-                monitors = json.load(f)
-        else:
-            monitors = {}
+        # Get monitors from in-memory storage
+        monitors = {}
+        for monitor_id, monitor in monitor_manager.monitors.items():
+            monitors[monitor_id] = {
+                'config': monitor.config,
+                'up': monitor.status.get('up', False),
+                'last_check': monitor.status.get('last_check'),
+                'response_time': monitor.status.get('response_time', 0),
+                'error': monitor.status.get('error', ''),
+                'uptime_24h': monitor.status.get('uptime_24h', 0),
+                'uptime_7d': monitor.status.get('uptime_7d', 0)
+            }
         
         monitors_by_category = {}
-        for category in categories:
-            cat_id = category.get('id', '') if isinstance(category, dict) else category
-            monitors_by_category[cat_id] = []
-        monitors_by_category['uncategorized'] = []
         
+        # Group monitors by category
         for monitor_id, monitor_data in monitors.items():
-            category = monitor_data.get('config', {}).get('category', 'uncategorized')
-            if category not in monitors_by_category:
-                category = 'uncategorized'
-            monitors_by_category[category].append((monitor_id, monitor_data))
+            category_id = monitor_data['config'].get('category')
+            if category_id not in monitors_by_category:
+                monitors_by_category[category_id] = []
+            
+            monitor_data['id'] = monitor_id
+            monitors_by_category[category_id].append(monitor_data)
         
+        # Create categories list with monitors
         categories_with_monitors = []
-        for category in categories:
-            if isinstance(category, dict):
-                cat_id = category.get('id', '')
-                category['monitors'] = monitors_by_category.get(cat_id, [])
-                categories_with_monitors.append(category)
-            else:
+        
+        # Add categorized monitors first
+        for category_id, category in category_map.items():
+            if category_id in monitors_by_category:
                 categories_with_monitors.append({
-                    'id': category,
-                    'name': category,
-                    'monitors': monitors_by_category.get(category, [])
+                    'id': category_id,
+                    'name': category.get('name', category_id),
+                    'monitors': monitors_by_category[category_id]
                 })
         
-        if monitors_by_category.get('uncategorized'):
+        # Add uncategorized monitors
+        if 'uncategorized' in monitors_by_category:
             categories_with_monitors.append({
                 'id': 'uncategorized',
                 'name': 'Uncategorized',
@@ -493,10 +475,18 @@ def index():
 def api_status():
     """API endpoint for monitor status"""
     try:
-        if os.path.exists(STATUS_FILE):
-            with open(STATUS_FILE, 'r') as f:
-                return jsonify(json.load(f))
-        return jsonify({})
+        status_data = {}
+        for monitor_id, monitor in monitor_manager.monitors.items():
+            status_data[monitor_id] = {
+                'config': monitor.config,
+                'up': monitor.status.get('up', False),
+                'last_check': monitor.status.get('last_check'),
+                'response_time': monitor.status.get('response_time', 0),
+                'error': monitor.status.get('error', ''),
+                'uptime_24h': monitor.status.get('uptime_24h', 0),
+                'uptime_7d': monitor.status.get('uptime_7d', 0)
+            }
+        return jsonify(status_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -507,15 +497,8 @@ def api_monitor_history(monitor_id):
         if not monitor_id or monitor_id == 'undefined':
             return jsonify({"error": "Invalid monitor ID"}), 400
             
-        if not os.path.exists(HISTORY_FILE):
-            return jsonify([])
-            
-        with open(HISTORY_FILE, 'r') as f:
-            try:
-                history_data = json.load(f)
-                return jsonify(history_data.get('history', {}).get(monitor_id, []))
-            except json.JSONDecodeError:
-                return jsonify({"error": "Invalid history data"}), 500
+        history = HISTORY_DATA.get('history', {}).get(monitor_id, [])
+        return jsonify(history)
                 
     except Exception as e:
         app.logger.error(f"Error fetching history for {monitor_id}: {str(e)}")
@@ -548,9 +531,10 @@ def start_monitoring_thread():
     update_status()
     return monitor_thread
 
+# Start monitoring thread when the module is imported
+monitor_thread = start_monitoring_thread()
+
 if __name__ == '__main__':
-    os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
-    monitor_thread = start_monitoring_thread()
     app.run(
         host=APP_CONFIG['app'].get('host', '0.0.0.0'),
         port=APP_CONFIG['app'].get('port', 5000),
