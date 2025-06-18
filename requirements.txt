@@ -1,0 +1,10 @@
+Flask
+PyYAML
+requests
+mcstatus
+pytz
+typing-extensions
+gunicorn
+python-dotenv
+watchdog
+asgiref

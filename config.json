@@ -1,0 +1,15 @@
+{
+  "app": {
+    "name": "Uptimium",
+    "timezone": "Europe/Stockholm",
+    "description": "Lightweight uptime monitoring solution",
+    "check_interval": 60,
+    "host": "127.0.0.1",
+    "port": 5000,
+    "history_size": 100,
+    "base_url": "https://uptime.isaweye.ink"
+  },
+  "ui": {
+    "footer": "Powered by Uptimium | <a href=\"https://git.isaweye.ink/isaweyed/uptimium\" target=\"_blank\">Git Repository</a>"
+  }
+}

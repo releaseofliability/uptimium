@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{ app_config.app.description }}">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ app_config.app.base_url }}">
+    <meta property="og:title" content="{{ app_config.app.name }} | Uptimium">
+    <meta property="og:description" content="{{ app_config.app.description }}">
+    <meta property="og:image" content="{{ app_config.app.base_url }}/static/logo.png">
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ app_config.app.base_url }}">
+    <meta name="twitter:title" content="{{ app_config.app.name }} | Uptimium">
+    <meta name="twitter:description" content="{{ app_config.app.description }}">
+    <meta name="twitter:image" content="{{ app_config.app.base_url }}/static/logo.png">
+    
+    <title>{{ app_config.app.name }} | Uptimium</title>
+    
+    <meta property="og:title" content="{{ app_config.app.name }} | Uptimium">
+    <meta property="og:description" content="{{ app_config.app.description }}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ app_config.app.base_url }}">
+    <meta property="og:site_name" content="{{ app_config.app.name }}">
+    
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <meta name="theme-color" content="#0d1a0b">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono:wght@400;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #a2f780;
+            --primary-dark: #7ae34a;
+            --primary-darker: #5ac42e;
+            --dark: #0d1a0b;
+            --darker: #080f06;
+            --light: #f8fafc;
+            --gray: #94a3b8;
+            --glass-border: rgba(255,255,255,0.1);
+            --card-bg: #1a2918;
+            --card-hover: #22351f;
+            --accent: #5ac42e;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --separator-color: rgba(255, 255, 255, 0.1);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Ubuntu', sans-serif;
+            background-color: var(--darker);
+            color: var(--light);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+            background-image: radial-gradient(circle at 25% 25%, rgba(92,196,46,0.1) 0%, transparent 50%),
+                            radial-gradient(circle at 75% 75%, rgba(122,227,74,0.1) 0%, transparent 50%);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-top: 1rem;
+            flex-wrap: wrap;
+            position: relative;
+        }
+        .logo {
+            font-size: clamp(1.8rem, 5vw, 2.2rem);
+            font-weight: 700;
+            font-family: 'Ubuntu Mono', monospace;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            position: relative;
+            margin-bottom: 0.5rem;
+            letter-spacing: -1px;
+            text-shadow: 0 0 10px rgba(122, 227, 74, 0.3);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .logo:hover {
+            text-decoration: none;
+        }
+        .logo-icon {
+            width: 2.5em;
+            height: 2.5em;
+            fill: currentColor;
+        }
+        .category-section {
+            margin-bottom: 3rem;
+        }
+        .category-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 2rem 0 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .category-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            fill: currentColor;
+            opacity: 0.8;
+        }
+        .category-separator {
+            width: 100%;
+            height: 1px;
+            background-color: var(--separator-color);
+            margin: 30px 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .category-separator span {
+            background-color: var(--primary);
+            color: var(--gray);
+            font-size: 0.9em;
+            padding: 0 15px;
+            position: relative;
+            top: -0.5em;
+        }
+        .category-header {
+            color: var(--accent);
+            margin: 20px 0 15px 0;
+            font-size: 1.5em;
+            font-weight: 500;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--separator-color);
+        }
+        #monitors-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        .category-container {
+            margin-bottom: 2rem;
+            width: 100%;
+        }
+        
+        .category-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+        }
+        .history-bar.down {
+            background: var(--danger);
+        }
+        .history-bar:hover {
+            opacity: 0.8;
+            transform: scaleX(1.5);
+        }
+        .history-tooltip {
+            position: absolute;
+            background: var(--darker);
+            border: 1px solid var(--glass-border);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+            min-width: 200px;
+        }
+        .history-bar:hover .history-tooltip {
+            opacity: 1;
+        }
+        .monitor-card {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            min-height: 120px;
+        }
+        .monitor-card-content {
+            padding: 1.5rem;
+            position: relative;
+            z-index: 1;
+            background: rgba(13, 26, 11, 0.8);
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .monitor-card-content[style*="background-image"] {
+            background: linear-gradient(rgba(13, 26, 11, 0.7), rgba(13, 26, 11, 0.9));
+        }
+        .monitor-card-content[style*="background-image"]::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: inherit;
+            background-size: cover;
+            background-position: center;
+            z-index: -1;
+            opacity: 0.3;
+        }
+        .monitor-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            border-color: var(--primary);
+        }
+        .monitor-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .monitor-logo {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+        .monitor-title-container {
+            flex: 1;
+            min-width: 0;
+        }
+        .monitor-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--light);
+            margin: 0 0 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .monitor-url {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--gray);
+            font-family: 'Ubuntu Mono', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .monitor-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .status-up { background-color: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .status-down { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .status-warning { background-color: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .status-pending { background-color: rgba(148, 163, 184, 0.1); color: var(--gray); }
+        
+        .monitor-details {
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            color: var(--gray);
+            flex: 1;
+        }
+        
+        .monitor-chart-container {
+            margin-top: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 0.5rem;
+            position: relative;
+            height: 100px;
+            overflow: hidden;
+        }
+        
+        .monitor-chart {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .monitor-chart canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .monitor-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--glass-border);
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--light);
+            margin-bottom: 0.25rem;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+        .monitor-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        .detail-label {
+            color: var(--gray);
+        }
+        .detail-value {
+            color: var(--light);
+            font-family: 'Ubuntu Mono', monospace;
+        }
+        .last-updated {
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: var(--gray);
+            text-align: right;
+        }
+        .glow-effect {
+            position: relative;
+            z-index: 1;
+        }
+        .glow-effect::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, var(--primary), transparent);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            pointer-events: none;
+            opacity: 0.5;
+            z-index: -1;
+        }
+        .separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 3rem 0 1.5rem;
+            color: var(--light);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .separator::before,
+        .separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .separator::before {
+            margin-right: 1rem;
+        }
+        .separator::after {
+            margin-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Uptimium Logo" class="logo-icon">
+                <span>{{ app_config.app.name }}</span>
+            </a>
+            <div>
+                <span>{{ app_config.app.description }}</span>
+            </div>
+        </header>
+
+        <div id="loading-indicator">
+            <span>Loading monitors...</span>
+        </div>
+        <div id="monitors-container"></div>
+
+        <footer style="margin-top: 4rem; text-align: center; color: var(--gray); font-size: 0.9rem; padding: 1.5rem 0; border-top: 1px solid var(--glass-border);">
+            {{ app_config.ui.footer|safe }}
+        </footer>
+    </div>
+
+    <script>
+        async function updateMonitorStatus() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const container = document.getElementById('monitors-container');
+            
+            try {
+                const timestamp = new Date().getTime();
+                const statusResponse = await fetch(`/api/status?_=${timestamp}`);
+                const data = await statusResponse.json();
+                
+                container.innerHTML = '';
+                
+                if (Object.keys(data).length === 0) {
+                    container.innerHTML = `
+                        <div class="monitor-card glow-effect">
+                            <div class="monitor-header">
+                                <h3 class="monitor-title">No monitors configured</h3>
+                            </div>
+                            <div class="monitor-details">
+                                <p>Create a config/monitors.yaml file to get started.</p>
+                            </div>
+                        </div>
+                    `;
+                    hideLoadingIndicator();
+                    return;
+                }
+                
+                let hasValidMonitors = false;
+                
+                const categories = {};
+                
+                for (const [id, monitor] of Object.entries(data)) {
+                    const config = monitor.config || {};
+                    const category = config.category || 'other';
+                    if (!categories[category]) {
+                        categories[category] = [];
+                    }
+                    categories[category].push({id, monitor});
+                }
+                
+                const categoryList = [];
+                try {
+                    const response = await fetch(`/api/categories?_=${timestamp}`);
+                    const categoryData = await response.json();
+                    if (Array.isArray(categoryData)) {
+                        categoryList.push(...categoryData);
+                    } else if (typeof categoryData === 'object' && categoryData !== null) {
+                        categoryList.push(...Object.entries(categoryData).map(([id, name]) => ({
+                            id,
+                            name,
+                            separator: true
+                        })));
+                    }
+                } catch (error) {
+                    console.error('Error loading categories:', error);
+                }
+                    
+                const sortedCategories = categoryList.length > 0 
+                        ? categoryList.filter(cat => categories[cat.id]?.length > 0)
+                        : Object.entries(categories).map(([id, items]) => ({
+                            id,
+                            name: id.charAt(0).toUpperCase() + id.slice(1),
+                            separator: true
+                        }));
+                    
+                let hasAddedMonitors = false;
+                
+                for (const category of sortedCategories) {
+                    const monitorsInCategory = categories[category.id] || [];
+                    if (monitorsInCategory.length === 0) continue;
+                    
+                    const categoryContainer = document.createElement('div');
+                    categoryContainer.className = 'category-container';
+                    
+                    if (category.name) {
+                        const categoryHeader = document.createElement('h2');
+                        categoryHeader.className = 'category-header';
+                        categoryHeader.textContent = category.name;
+                        categoryContainer.appendChild(categoryHeader);
+                    }
+                    
+                    const categoryRow = document.createElement('div');
+                    categoryRow.className = 'category-row';
+                        
+                    for (const {id, monitor} of monitorsInCategory) {
+                            hasAddedMonitors = true;
+                            try {
+                            const status = {
+                                up: monitor.up,
+                                last_check: monitor.last_check,
+                                response_time: monitor.response_time,
+                                error: monitor.error,
+                                uptime_24h: monitor.uptime_24h,
+                                uptime_7d: monitor.uptime_7d,
+                                total_checks: monitor.total_checks,
+                                successful_checks: monitor.successful_checks
+                            };
+                            
+                            const config = monitor.config || {};
+                            const display = config.display || {
+                                show_history: true,
+                                show_target: true,
+                                show_type: true,
+                                show_response_time: true
+                            };
+                            
+                            if (!config || !config.type) {
+                                console.warn(`Skipping monitor ${id} - missing config or type`);
+                                continue;
+                            }
+                            
+                            const lastCheck = status.last_check ? new Date(status.last_check).toLocaleString() : 'Never';
+                            let statusClass = 'status-pending';
+                            let statusText = 'PENDING';
+                            
+                            if (status.up === true) {
+                                statusClass = 'status-up';
+                                statusText = 'UP';
+                            } else if (status.up === false) {
+                                statusClass = 'status-down';
+                                statusText = 'DOWN';
+                            }
+                            
+                            hasValidMonitors = true;
+                        
+                            const monitorEl = document.createElement('div');
+                            monitorEl.id = `monitor-${id}`;
+                            monitorEl.className = 'monitor-card glow-effect';
+                            const logoHtml = config.logo ? 
+                                `<img src="${config.logo}" alt="${config.name || id} logo" class="monitor-logo">` : '';
+                                
+                            const bgStyle = config.background ? 
+                                `style="background-image: url('${config.background}');"` : '';
+                                
+                            monitorEl.innerHTML = `
+                                <div class="monitor-card-content" ${bgStyle}>
+                                    <div class="monitor-header">
+                                        ${logoHtml}
+                                        <h3 class="monitor-title">${config.name || id}</h3>
+                                        <span class="monitor-status ${statusClass}">${statusText}</span>
+                                </div>
+                                <div class="monitor-details">
+                                    ${display.show_type !== false ? `
+                                    <div class="monitor-detail">
+                                        <span class="detail-label">Type:</span>
+                                        <span class="detail-value">${config.type ? config.type.toUpperCase() : 'UNKNOWN'}</span>
+                                    </div>` : ''}
+                                    ${display.show_target !== false ? `
+                                    <div class="monitor-detail">
+                                        <span class="detail-label">Target:</span>
+                                        <span class="detail-value">${config.url || `${config.host || ''}${config.port ? ':' + config.port : ''}`.trim() || 'N/A'}</span>
+                                    </div>` : ''}
+                                    ${(display.show_response_time !== false && status.response_time !== undefined) ? `
+                                    <div class="monitor-detail">
+                                        <span class="detail-label">Response Time:</span>
+                                        <span class="detail-value">${status.response_time.toFixed(2)} ms</span>
+                                    </div>` : ''}
+                                    ${status.error ? `
+                                    <div class="monitor-detail">
+                                        <span class="detail-label">Error:</span>
+                                        <span class="detail-value" style="color: var(--danger)">${status.error}</span>
+                                    </div>` : ''}
+                                    ${display.show_history !== false ? `
+                                    <div class="monitor-chart-container">
+                                        <div class="monitor-chart"></div>
+                                    </div>` : ''}
+                                </div>
+                                <div class="last-updated">
+                                    Last checked: ${lastCheck}
+                                    ${status.uptime_24h !== undefined ? `• Uptime (24h): ${status.uptime_24h.toFixed(2)}%` : ''}
+                                </div>
+                            `;
+                            
+                            categoryRow.appendChild(monitorEl);
+                        } catch (error) {
+                            console.error(`Error rendering monitor ${id}:`, error);
+                        }
+                    }
+                    
+                    if (categoryRow.hasChildNodes()) {
+                        categoryContainer.appendChild(categoryRow);
+                        container.appendChild(categoryContainer);
+                    }
+                    
+                    hideLoadingIndicator();
+                    
+                    if (!hasValidMonitors && Object.keys(data).length > 0) {
+                        container.innerHTML = `
+                            <div class="monitor-card glow-effect">
+                                <div class="monitor-header">
+                                    <h3 class="monitor-title">Configuration Error</h3>
+                                </div>
+                                <div class="monitor-details">
+                                    <p>No valid monitors found in configuration. Check your monitors.yml file.</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            }catch(error){
+                console.error('Error fetching status:', error);
+                document.getElementById('monitors-container').innerHTML = `
+                    <div class="monitor-card glow-effect">
+                        <div class="monitor-header">
+                            <h3 class="monitor-title">Error</h3>
+                            <span class="monitor-status status-down">ERROR</span>
+                        </div>
+                        <div class="monitor-details">
+                            <p>Failed to load monitor status. Check console for details.</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateMonitorStatus().catch(console.error);
+            
+            setTimeout(renderAllHistoryCharts, 500);
+        });
+        
+        function hideLoadingIndicator() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.opacity = '0';
+                setTimeout(() => {
+                    loadingIndicator.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        function renderHistoryChart(monitorId, history) {
+            try {
+                if (!monitorId || !history || !Array.isArray(history)) {
+                    console.warn(`Invalid data for monitor ${monitorId}:`, history);
+                    return;
+                }
+                
+                const canvas = document.createElement('canvas');
+                canvas.id = `chart-${monitorId}`;
+                canvas.width = 300;
+                canvas.height = 80;
+                
+                const container = document.querySelector(`#monitor-${monitorId} .monitor-chart`);
+                if (!container) {
+                    console.warn(`Container not found for monitor ${monitorId}`);
+                    return;
+                }
+                
+                container.innerHTML = '';
+                container.appendChild(canvas);
+                
+                const validHistory = Array.isArray(history) ? history : [];
+                
+                const ctx = canvas.getContext('2d');
+                validHistory.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: validHistory.map((_, i) => i + 1),
+                        datasets: [{
+                            data: validHistory.map(entry => entry && entry.up ? 1 : 0),
+                            backgroundColor: validHistory.map(entry => entry && entry.up ? '#4CAF50' : '#F44336'),
+                            borderWidth: 0,
+                            barPercentage: 1,
+                            categoryPercentage: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const entry = validHistory[context.dataIndex];
+                                        if (!entry) return 'No data';
+                                        
+                                        const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : 'Unknown time';
+                                        const status = entry.up ? 'UP' : 'DOWN';
+                                        const responseTime = entry.response_time ? ` (${entry.response_time.toFixed(2)}ms)` : '';
+                                        return `${time}: ${status}${responseTime}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: false,
+                                grid: { display: false },
+                                min: 0,
+                                max: validHistory.length || 1
+                            },
+                            y: {
+                                display: false,
+                                min: 0,
+                                max: 1,
+                                ticks: { stepSize: 1 },
+                                grid: { display: false }
+                            }
+                        },
+                        animation: { duration: 0 },
+                        hover: { mode: null },
+                        interaction: { mode: 'nearest' }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering chart for monitor ${monitorId}:`, error);
+            }
+        }
+
+        async function renderAllHistoryCharts() {
+            const monitors = document.querySelectorAll('.monitor-card');
+            
+            for (const monitor of monitors) {
+                try {
+                    const monitorId = monitor.id.replace('monitor-', '');
+                    if (!monitorId) {
+                        console.warn('Monitor element has no valid ID:', monitor);
+                        continue;
+                    }
+                    
+                    const monitorElement = document.getElementById(`monitor-${monitorId}`);
+                    if (!monitorElement || !monitorElement.querySelector('.monitor-chart-container')) {
+                        continue;
+                    }
+                    
+                    const response = await fetch(`/api/monitor/${monitorId}/history`);
+                    if (!response.ok) {
+                        console.error(`Error response for ${monitorId}:`, response.status);
+                        continue;
+                    }
+                    
+                    const history = await response.json();
+                    if (history && history.error) {
+                        console.error(`Error in response for ${monitorId}:`, history.error);
+                        continue;
+                    }
+                    
+                    if (!Array.isArray(history)) {
+                        console.warn(`Invalid history format for ${monitorId}:`, history);
+                        continue;
+                    }
+                    
+                    renderHistoryChart(monitorId, history);
+                } catch (error) {
+                    console.error(`Error processing monitor ${monitor.id}:`, error);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+    </script>
+</body>
+</html>
