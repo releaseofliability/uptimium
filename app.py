@@ -1,8 +1,9 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import yaml
 import os
 import time
 import socket
+import logging
 import requests
 import threading
 import json
@@ -12,10 +13,64 @@ from mcstatus import JavaServer
 from typing import Dict, List, Any
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__, static_folder='static')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+def get_remote_address():
+    """Get the real client IP, handling Cloudflare headers"""
+    # Check for Cloudflare headers first
+    cf_connecting_ip = request.headers.get('CF-Connecting-IP')
+    if cf_connecting_ip:
+        return cf_connecting_ip
+    
+    # Fall back to X-Forwarded-For if present
+    if request.headers.getlist("X-Forwarded-For"):
+        return request.headers.getlist("X-Forwarded-For")[0]
+    
+    # Default to remote_addr
+    return request.remote_addr
+
+def is_local_request():
+    remote = get_remote_address()
+    return remote in ('127.0.0.1', 'localhost', '::1')
+
+def log_ratelimit_exceeded(request_limit):
+    try:
+        client_ip = get_remote_address()
+        
+        # Safely get limit string
+        limit_str = str(getattr(request_limit, 'limit', request_limit))
+        
+        # Safely get reset time if available
+        retry_after = None
+        if hasattr(request_limit, 'reset_at') and hasattr(request_limit.reset_at, 'isoformat'):
+            try:
+                retry_after = request_limit.reset_at.isoformat()
+            except (AttributeError, TypeError):
+                pass
+        
+        app.logger.warning(f"Rate limit exceeded - Client IP: {client_ip}, Limit: {limit_str}")
+        
+        response_data = {
+            "status": "error",
+            "message": f"Rate limit exceeded: {limit_str}"
+        }
+        if retry_after:
+            response_data["retry_after"] = retry_after
+            
+        return jsonify(response_data), 429
+        
+    except Exception as e:
+        app.logger.error(f"Error in rate limit handler: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": "Rate limit exceeded"
+        }), 429
+
+# Application configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 MONITORS_FILE = os.path.join(BASE_DIR, 'config', 'monitors.yml')
@@ -25,6 +80,33 @@ STATUS_DATA = {}
 HISTORY_DATA = {
     'history': {}  # Format: {monitor_id: [history_entries]}
 }
+
+# Configure trusted proxies for Flask
+app.config['TRUSTED_PROXIES'] = [
+    '127.0.0.1',
+    '172.18.0.0/16',  # Docker network
+    '10.0.0.0/8',    # Private networks
+    '192.168.0.0/16', # Private networks
+    'fc00::/7',       # IPv6 private networks
+    '::1'             # IPv6 localhost
+]
+
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["30 per minute"],
+    default_limits_exempt_when=is_local_request,
+    storage_uri="memory://",
+    on_breach=log_ratelimit_exceeded,
+    headers_enabled=True  # Enable rate limit headers in response
+)
+
+# Configure logging
+app.logger.setLevel('INFO')
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+app.logger.addHandler(handler)
 
 print("Using in-memory storage for status and history")
 
@@ -491,6 +573,7 @@ def api_status():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/monitor/<monitor_id>/history')
+@limiter.limit("30 per minute")
 def api_monitor_history(monitor_id):
     """API endpoint for monitor history"""
     try:
@@ -505,19 +588,52 @@ def api_monitor_history(monitor_id):
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/categories')
+@limiter.limit("60 per minute")
 def api_categories():
     """API endpoint for categories"""
     try:
-        config = load_monitors()
-        categories = config.get('categories', [])
-        
-        if isinstance(categories, dict):
-            categories = [{"id": k, "name": v, "separator": True} for k, v in categories.items()]
-            
+        categories = []
+        for cat in monitor_manager.categories:
+            category = monitor_manager.categories[cat].copy()
+            category['id'] = cat
+            categories.append(category)
         return jsonify(categories)
     except Exception as e:
-        app.logger.error(f"Error in categories endpoint: {str(e)}")
+        app.logger.error(f"Error getting categories: {str(e)}")
         return jsonify({"error": "Failed to load categories"}), 500
+
+@app.route('/api/availability')
+@limiter.limit("60 per minute")
+def api_availability():
+    """API endpoint for quick service availability check"""
+    try:
+        result = {
+            'status': 'ok',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'services': {}
+        }
+        
+        for monitor_id, monitor in monitor_manager.monitors.items():
+            result['services'][monitor_id] = {
+                'name': monitor.config.get('name', monitor_id),
+                'status': 'up' if monitor.status.get('up') else 'down',
+                'last_check': monitor.status.get('last_check'),
+                'response_time': monitor.status.get('response_time'),
+                'type': monitor.config.get('type')
+            }
+            
+            # If any service is down, set overall status to 'degraded'
+            if not monitor.status.get('up'):
+                result['status'] = 'degraded'
+                
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"Error in availability check: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': 'Failed to check service availability',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
 
 def start_monitoring_thread():
     """Start the monitoring thread"""
@@ -525,8 +641,6 @@ def start_monitoring_thread():
     monitor_thread = threading.Thread(target=run_checks, daemon=True)
     monitor_thread.start()
     print("Monitoring thread started")
-    
-    # Run an initial check immediately
     print("Running initial check...")
     update_status()
     return monitor_thread

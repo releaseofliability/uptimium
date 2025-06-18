@@ -6,7 +6,7 @@ services:
     container_name: uptimium
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8150:5000"
+      - "5000:5000"
     volumes:
       - .:/app
       - ./config:/app/config

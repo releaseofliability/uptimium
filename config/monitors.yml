@@ -14,6 +14,12 @@ monitors:
       show_target: false
       show_type: false
       show_response_time: true
+      # Custom colors (optional)
+      header_text: "#ff00ff"
+      text_color: "#00ff00"
+      data_color: "#ff0000"
+      # Text shadow settings (optional)
+      text_shadow: "2px 2px 4px rgba(0, 0, 0, 0.5)"  # horizontal-offset vertical-offset blur-radius color
 
   # TCP Service Monitor
   ssh_service:

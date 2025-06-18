@@ -553,40 +553,46 @@
                             const bgStyle = config.background ? 
                                 `style="background-image: url('${config.background}');"` : '';
                                 
+                            // Get custom colors and effects from config or use defaults
+                            const headerTextColor = (config.display && config.display.header_text) || 'var(--light)';
+                            const textColor = (config.display && config.display.text_color) || 'var(--gray)';
+                            const dataColor = (config.display && config.display.data_color) || 'var(--light)';
+                            const textShadow = (config.display && config.display.text_shadow) || 'none';
+                            
                             monitorEl.innerHTML = `
-                                <div class="monitor-card-content" ${bgStyle}>
-                                    <div class="monitor-header">
+                                <div class="monitor-card-content" ${bgStyle} style="color: ${textColor};">
+                                    <div class="monitor-header" style="color: ${headerTextColor};">
                                         ${logoHtml}
-                                        <h3 class="monitor-title">${config.name || id}</h3>
+                                        <h3 class="monitor-title" style="color: ${headerTextColor}; text-shadow: ${textShadow};">${config.name || id}</h3>
                                         <span class="monitor-status ${statusClass}">${statusText}</span>
                                 </div>
                                 <div class="monitor-details">
                                     ${display.show_type !== false ? `
                                     <div class="monitor-detail">
-                                        <span class="detail-label">Type:</span>
-                                        <span class="detail-value">${config.type ? config.type.toUpperCase() : 'UNKNOWN'}</span>
+                                        <span class="detail-label" style="color: ${textColor}; text-shadow: ${textShadow};">Type:</span>
+                                        <span class="detail-value" style="color: ${dataColor}; text-shadow: ${textShadow};">${config.type ? config.type.toUpperCase() : 'UNKNOWN'}</span>
                                     </div>` : ''}
                                     ${display.show_target !== false ? `
                                     <div class="monitor-detail">
-                                        <span class="detail-label">Target:</span>
-                                        <span class="detail-value">${config.url || `${config.host || ''}${config.port ? ':' + config.port : ''}`.trim() || 'N/A'}</span>
+                                        <span class="detail-label" style="color: ${textColor}; text-shadow: ${textShadow};">Target:</span>
+                                        <span class="detail-value" style="color: ${dataColor}; text-shadow: ${textShadow};">${config.url || `${config.host || ''}${config.port ? ':' + config.port : ''}`.trim() || 'N/A'}</span>
                                     </div>` : ''}
                                     ${(display.show_response_time !== false && status.response_time !== undefined) ? `
                                     <div class="monitor-detail">
-                                        <span class="detail-label">Response Time:</span>
-                                        <span class="detail-value">${status.response_time.toFixed(2)} ms</span>
+                                        <span class="detail-label" style="color: ${textColor}; text-shadow: ${textShadow};">Response Time:</span>
+                                        <span class="detail-value" style="color: ${dataColor}; text-shadow: ${textShadow};">${status.response_time.toFixed(2)} ms</span>
                                     </div>` : ''}
                                     ${status.error ? `
                                     <div class="monitor-detail">
-                                        <span class="detail-label">Error:</span>
-                                        <span class="detail-value" style="color: var(--danger)">${status.error}</span>
+                                        <span class="detail-label" style="color: ${textColor}; text-shadow: ${textShadow};">Error:</span>
+                                        <span class="detail-value" style="color: var(--danger); text-shadow: ${textShadow};">${status.error}</span>
                                     </div>` : ''}
                                     ${display.show_history !== false ? `
                                     <div class="monitor-chart-container">
                                         <div class="monitor-chart"></div>
                                     </div>` : ''}
                                 </div>
-                                <div class="last-updated">
+                                <div class="last-updated" style="color: ${textColor}; text-shadow: ${textShadow};">
                                     Last checked: ${lastCheck}
                                     ${status.uptime_24h !== undefined ? `• Uptime (24h): ${status.uptime_24h.toFixed(2)}%` : ''}
                                 </div>
