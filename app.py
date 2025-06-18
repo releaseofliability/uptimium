@@ -15,9 +15,11 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+CORS(app)
 
 def get_remote_address():
     """Get the real client IP, handling Cloudflare headers"""
