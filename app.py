@@ -19,13 +19,22 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Configuration paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
-MONITORS_FILE = os.path.join(BASE_DIR, 'monitors.yml')
+MONITORS_FILE = os.path.join(BASE_DIR, 'config', 'monitors.yml')
 STATUS_FILE = os.path.join(BASE_DIR, 'status.json')
 HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
 
+# Debug paths
+print(f"CONFIG_FILE: {CONFIG_FILE}")
+print(f"MONITORS_FILE: {MONITORS_FILE}")
+print(f"File exists: {os.path.exists(MONITORS_FILE)}")
+
 # Load app config
-with open(CONFIG_FILE, 'r') as f:
-    APP_CONFIG = json.load(f)
+try:
+    with open(CONFIG_FILE, 'r') as f:
+        APP_CONFIG = json.load(f)
+except Exception as e:
+    print(f"Error loading config.json: {e}")
+    APP_CONFIG = {}
 
 # Timezone
 try:
@@ -84,10 +93,17 @@ class MonitorManager:
     def load_config(self):
         """Load monitor configuration from YAML file and update monitors"""
         try:
+            print(f"[DEBUG] Loading config from: {self.config_path}")
+            print(f"[DEBUG] File exists: {os.path.exists(self.config_path)}")
+            
             with open(self.config_path, 'r') as f:
-                config = yaml.safe_load(f) or {}
+                config_content = f.read()
+                print(f"[DEBUG] File content: {config_content[:200]}...")
+                config = yaml.safe_load(config_content) or {}
                 
+            print(f"[DEBUG] Parsed config: {config}")
             monitors_config = config.get('monitors', {})
+            print(f"[DEBUG] Found {len(monitors_config)} monitors in config")
             categories_config = config.get('categories', {})
             print(f"Loaded configuration with {len(monitors_config)} monitors and {len(categories_config)} categories")
             
@@ -522,9 +538,14 @@ def api_categories():
 
 def start_monitoring_thread():
     """Start the monitoring thread"""
+    print("Starting monitoring thread...")
     monitor_thread = threading.Thread(target=run_checks, daemon=True)
     monitor_thread.start()
     print("Monitoring thread started")
+    
+    # Run an initial check immediately
+    print("Running initial check...")
+    update_status()
     return monitor_thread
 
 if __name__ == '__main__':
