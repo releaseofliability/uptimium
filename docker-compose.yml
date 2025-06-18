@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: uptimium
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - uptimium_data:/app/data
+    environment:
+      - TZ=Europe/Moscow
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+    networks:
+      - uptimium_network
+
+networks:
+  uptimium_network:
+    driver: bridge
+
+volumes:
+  uptimium_data:
+    driver: local
